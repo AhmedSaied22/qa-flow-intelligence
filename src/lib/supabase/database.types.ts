@@ -149,6 +149,93 @@ export type Database = {
           }
         ];
       };
+      ai_provider_settings: {
+        Row: {
+          created_at: string;
+          gemini_api_key: string | null;
+          gemini_free_quota_limit: number;
+          gemini_free_quota_used: number;
+          id: string;
+          owner_id: string;
+          provider: string;
+          updated_at: string;
+          use_byok: boolean;
+        };
+        Insert: {
+          created_at?: string;
+          gemini_api_key?: string | null;
+          gemini_free_quota_limit?: number;
+          gemini_free_quota_used?: number;
+          id?: string;
+          owner_id: string;
+          provider?: string;
+          updated_at?: string;
+          use_byok?: boolean;
+        };
+        Update: {
+          created_at?: string;
+          gemini_api_key?: string | null;
+          gemini_free_quota_limit?: number;
+          gemini_free_quota_used?: number;
+          id?: string;
+          owner_id?: string;
+          provider?: string;
+          updated_at?: string;
+          use_byok?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_provider_settings_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      ai_usage_events: {
+        Row: {
+          ai_generation_id: string | null;
+          cache_hit: boolean;
+          created_at: string;
+          id: string;
+          model: string;
+          owner_id: string;
+          provider: string;
+          प्रतिक्रिया?: never;
+          response_time_ms: number | null;
+          source: string;
+          tokens_in: number;
+          tokens_out: number;
+        };
+        Insert: {
+          ai_generation_id?: string | null;
+          cache_hit?: boolean;
+          created_at?: string;
+          id?: string;
+          model: string;
+          owner_id: string;
+          provider: string;
+          response_time_ms?: number | null;
+          source?: string;
+          tokens_in?: number;
+          tokens_out?: number;
+        };
+        Update: {
+          ai_generation_id?: string | null;
+          cache_hit?: boolean;
+          created_at?: string;
+          id?: string;
+          model?: string;
+          owner_id?: string;
+          provider?: string;
+          response_time_ms?: number | null;
+          source?: string;
+          tokens_in?: number;
+          tokens_out?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
