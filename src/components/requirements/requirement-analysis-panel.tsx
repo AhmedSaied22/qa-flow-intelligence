@@ -1,8 +1,13 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { PlatformSelector } from "./platform-selector";
 import type { PlatformKind } from "@/lib/platform/types";
 
@@ -10,6 +15,7 @@ type RequirementAnalysisPanelProps = {
   requirementId: string;
   projectId: string;
   defaultPlatforms: PlatformKind[];
+  initialAnalysis?: unknown;
 };
 
 type AnalysisState = {
@@ -18,20 +24,164 @@ type AnalysisState = {
   analysis?: unknown;
 };
 
+type RequirementAnalysis = {
+  summary: string;
+  risk_level: "low" | "medium" | "high";
+  ambiguities: string[];
+  missing_details: string[];
+  edge_cases: string[];
+  platform_focus: Array<{
+    platform: PlatformKind;
+    highlights: string[];
+  }>;
+  suggested_test_case_count: number;
+};
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isRequirementAnalysis(value: unknown): value is RequirementAnalysis {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+
+  return (
+    typeof record.summary === "string" &&
+    (record.risk_level === "low" || record.risk_level === "medium" || record.risk_level === "high") &&
+    isStringArray(record.ambiguities) &&
+    isStringArray(record.missing_details) &&
+    isStringArray(record.edge_cases) &&
+    typeof record.suggested_test_case_count === "number" &&
+    Array.isArray(record.platform_focus) &&
+    record.platform_focus.every((item) => {
+      if (typeof item !== "object" || item === null) return false;
+      const platformRecord = item as Record<string, unknown>;
+      return (
+        (platformRecord.platform === "web" || platformRecord.platform === "mobile") &&
+        isStringArray(platformRecord.highlights)
+      );
+    })
+  );
+}
+
+function EmptyList({ label }: { label: string }) {
+  return <p className="text-sm text-muted-foreground">No {label.toLowerCase()} found.</p>;
+}
+
+function AnalysisList({ items, label }: { items: string[]; label: string }) {
+  if (items.length === 0) {
+    return <EmptyList label={label} />;
+  }
+
+  return (
+    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+      {items.map((item, index) => (
+        <li key={`${label}-${index}`}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
+function AnalysisSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-2 border-t pt-4">
+      <h3 className="text-sm font-medium">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function RequirementAnalysisResult({ analysis }: { analysis: unknown }) {
+  if (!isRequirementAnalysis(analysis)) {
+    if (process.env.NODE_ENV !== "development") {
+      return <p className="text-sm text-muted-foreground">Analysis is saved, but it could not be displayed.</p>;
+    }
+
+    return (
+      <details className="rounded-md border bg-muted/30 p-3 text-xs">
+        <summary className="cursor-pointer text-sm font-medium">Debug analysis payload</summary>
+        <pre className="mt-3 overflow-auto">{JSON.stringify(analysis, null, 2)}</pre>
+      </details>
+    );
+  }
+
+  const riskClassName =
+    analysis.risk_level === "high"
+      ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+      : analysis.risk_level === "medium"
+        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary" className={riskClassName}>
+          {analysis.risk_level} risk
+        </Badge>
+        <Badge variant="secondary">{analysis.suggested_test_case_count} suggested cases</Badge>
+      </div>
+
+      <AnalysisSection title="Summary">
+        <p className="text-sm text-muted-foreground">{analysis.summary}</p>
+      </AnalysisSection>
+
+      <AnalysisSection title="Ambiguities">
+        <AnalysisList items={analysis.ambiguities} label="Ambiguities" />
+      </AnalysisSection>
+
+      <AnalysisSection title="Missing Details">
+        <AnalysisList items={analysis.missing_details} label="Missing details" />
+      </AnalysisSection>
+
+      <AnalysisSection title="Edge Cases">
+        <AnalysisList items={analysis.edge_cases} label="Edge cases" />
+      </AnalysisSection>
+
+      <AnalysisSection title="Platform Focus">
+        {analysis.platform_focus.length === 0 ? (
+          <EmptyList label="Platform focus" />
+        ) : (
+          <div className="space-y-3">
+            {analysis.platform_focus.map((item) => (
+              <div key={item.platform} className="space-y-2">
+                <Badge variant="secondary" className="capitalize">
+                  {item.platform}
+                </Badge>
+                <AnalysisList items={item.highlights} label={`${item.platform} highlights`} />
+              </div>
+            ))}
+          </div>
+        )}
+      </AnalysisSection>
+    </div>
+  );
+}
+
 export function RequirementAnalysisPanel({
   requirementId,
   projectId,
   defaultPlatforms,
+  initialAnalysis,
 }: RequirementAnalysisPanelProps) {
+  const router = useRouter();
   const [state, setState] = useState<AnalysisState>({ status: "idle" });
   const [platforms, setPlatforms] = useState<PlatformKind[]>(defaultPlatforms);
   const [isPending, startTransition] = useTransition();
   const canRetry = useMemo(() => state.status === "error" || state.status === "success", [state.status]);
+  const displayedAnalysis = state.status === "success" ? state.analysis : initialAnalysis;
+  const needsProviderSetup =
+    state.message === "No AI provider configured. Add a Gemini API key in AI Settings to run analysis.";
 
   async function runAnalysis() {
     setState({ status: "loading" });
 
-      const response = await fetch("/api/requirements/analyze", {
+    const response = await fetch("/api/requirements/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ requirementId, projectId, platforms }),
@@ -54,6 +204,12 @@ export function RequirementAnalysisPanel({
       analysis: payload?.analysis,
       message: payload?.cached ? "Cached result reused." : "Analysis completed.",
     });
+    window.dispatchEvent(
+      new CustomEvent("requirement-analysis:saved", {
+        detail: { requirementId },
+      }),
+    );
+    router.refresh();
   }
 
   return (
@@ -91,15 +247,22 @@ export function RequirementAnalysisPanel({
       </div>
 
       {state.status === "error" ? (
-        <p className="text-sm text-destructive">{state.message}</p>
+        <div className="space-y-2">
+          <p className="text-sm text-destructive">{state.message}</p>
+          {needsProviderSetup ? (
+            <Link className={buttonVariants({ variant: "outline", size: "sm" })} href="/dashboard/settings">
+              Open AI Settings
+            </Link>
+          ) : null}
+        </div>
       ) : null}
 
-      {state.status === "success" ? (
+      {displayedAnalysis ? (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{state.message}</p>
-          <pre className="overflow-auto rounded-md border bg-muted/30 p-3 text-xs">
-            {JSON.stringify(state.analysis, null, 2)}
-          </pre>
+          <p className="text-sm text-muted-foreground">
+            {state.status === "success" ? state.message : "Saved analysis."}
+          </p>
+          <RequirementAnalysisResult analysis={displayedAnalysis} />
         </div>
       ) : null}
     </section>

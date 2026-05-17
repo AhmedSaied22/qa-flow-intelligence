@@ -23,9 +23,9 @@ async function createRequirement(formData: FormData) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getUser();
+  const { data, error: authError } = await supabase.auth.getUser();
 
-  if (!data.user) {
+  if (authError || !data.user) {
     redirect("/login");
   }
 
@@ -37,7 +37,12 @@ async function createRequirement(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/dashboard/projects/${projectId}?error=create-requirement`);
+    console.error("Create requirement failed", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+    });
+    redirect(`/dashboard/projects/${projectId}?error=create-requirement&code=${encodeURIComponent(error.code ?? "unknown")}`);
   }
 
   redirect(`/dashboard/projects/${projectId}`);
@@ -45,10 +50,13 @@ async function createRequirement(formData: FormData) {
 
 export default async function ProjectRequirementsPage({
   params,
+  searchParams,
 }: Readonly<{
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ error?: string; code?: string }>;
 }>) {
   const { projectId } = await params;
+  const query = await searchParams;
   const supabase = await createSupabaseServerClient();
   const { data: userData } = await supabase.auth.getUser();
   const user = userData.user;
@@ -71,6 +79,16 @@ export default async function ProjectRequirementsPage({
   }
 
   const requirements = (requirementsResult.data ?? []) as Requirement[];
+  const requirementErrorMessages: Record<string, string> = {
+    "missing-fields": "Requirement title is required.",
+    "create-requirement": "Requirement could not be created. Check the requirements migration, grants, and RLS policies in Supabase.",
+  };
+  const supabaseCodeMessages: Record<string, string> = {
+    PGRST205: "Supabase cannot find public.requirements. Apply the requirements migration, then reload the schema cache.",
+    "42501": "Supabase rejected the insert because of permissions or RLS. Confirm the requirements grants and policies exist, then reload the schema cache.",
+  };
+  const requirementError = query.error ? requirementErrorMessages[query.error] : null;
+  const requirementSupabaseCodeMessage = query.code ? supabaseCodeMessages[query.code] : null;
 
   return (
     <AppShell>
@@ -108,6 +126,16 @@ export default async function ProjectRequirementsPage({
             Add requirement
           </Button>
         </form>
+
+        {requirementError ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {requirementError}
+            {requirementSupabaseCodeMessage ? (
+              <span className="block text-xs opacity-90">{requirementSupabaseCodeMessage}</span>
+            ) : null}
+            {query.code ? <span className="block text-xs opacity-80">Supabase code: {query.code}</span> : null}
+          </div>
+        ) : null}
 
         {requirements.length === 0 ? (
           <div className="rounded-lg border border-dashed p-6">

@@ -1,5 +1,7 @@
 create extension if not exists pgcrypto;
 
+grant usage on schema public to anon, authenticated;
+
 create table if not exists public.ai_generations (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -24,6 +26,10 @@ create table if not exists public.ai_generations (
 create index if not exists ai_generations_owner_id_idx on public.ai_generations(owner_id);
 create index if not exists ai_generations_input_hash_idx on public.ai_generations(input_hash);
 create index if not exists ai_generations_prompt_version_idx on public.ai_generations(prompt_version);
+
+grant select, insert, update, delete
+on table public.ai_generations
+to authenticated;
 
 alter table public.ai_generations enable row level security;
 

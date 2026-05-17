@@ -1,5 +1,7 @@
 create extension if not exists pgcrypto;
 
+grant usage on schema public to anon, authenticated;
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text,
@@ -10,6 +12,10 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles enable row level security;
+
+grant select, insert, update, delete
+on table public.profiles
+to authenticated;
 
 create or replace function public.handle_new_user()
 returns trigger

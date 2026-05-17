@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PlatformBadges } from "@/components/requirements/platform-badges";
 import { RequirementAnalysisPanel } from "@/components/requirements/requirement-analysis-panel";
+import { TestCaseGenerationPanel } from "@/components/requirements/test-case-generation-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDefaultRequirementPlatforms } from "@/lib/ai/prompts/requirement-analysis/v1";
@@ -26,6 +27,17 @@ export default async function RequirementPage({
     supabase.from("projects").select("*").eq("id", projectId).maybeSingle(),
     supabase.from("requirements").select("*").eq("id", requirementId).maybeSingle(),
   ]);
+
+  const { data: requirementAnalysisGeneration } = await supabase
+    .from("ai_generations")
+    .select("*")
+    .eq("owner_id", userData.user.id)
+    .eq("requirement_id", requirementId)
+    .eq("status", "success")
+    .eq("generation_type", "Analyze requirements for ambiguity, missing details, and risk.")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (!project || !requirement || project.owner_id !== userData.user.id || requirement.owner_id !== userData.user.id) {
     notFound();
@@ -51,6 +63,14 @@ export default async function RequirementPage({
           requirementId={requirement.id}
           projectId={project.id}
           defaultPlatforms={getDefaultRequirementPlatforms(requirement)}
+          initialAnalysis={requirementAnalysisGeneration?.output_json}
+        />
+
+        <TestCaseGenerationPanel
+          requirementId={requirement.id}
+          projectId={project.id}
+          defaultPlatforms={getDefaultRequirementPlatforms(requirement)}
+          hasSavedAnalysis={Boolean(requirementAnalysisGeneration?.output_json)}
         />
       </section>
     </AppShell>
