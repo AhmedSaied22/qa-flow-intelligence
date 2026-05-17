@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
-import { FolderPlus, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
-import { ProjectEmptyState } from "@/components/projects/project-empty-state";
 import type { Database } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -88,17 +87,18 @@ export default async function DashboardPage() {
               className="h-8 rounded-md border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
             <Button type="submit">
-              <FolderPlus className="size-4" />
               Create project
             </Button>
           </form>
 
           {projects.length === 0 ? (
-            <ProjectEmptyState />
+            <div className="rounded-lg border border-dashed p-6">
+              <p className="text-sm text-muted-foreground">No projects yet.</p>
+            </div>
           ) : (
             <div className="grid gap-3">
               {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
+                <ProjectCard key={project.id} project={project} href={`/dashboard/projects/${project.id}`} />
               ))}
             </div>
           )}

@@ -63,6 +63,92 @@ export type Database = {
           }
         ];
       };
+      requirements: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          id: string;
+          owner_id: string;
+          project_id: string;
+          status: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          owner_id: string;
+          project_id: string;
+          status?: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          owner_id?: string;
+          project_id?: string;
+          status?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "requirements_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "requirements_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      requirement_versions: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          id: string;
+          requirement_id: string;
+          status: string;
+          title: string;
+          version_number: number;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          requirement_id: string;
+          status: string;
+          title: string;
+          version_number: number;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          requirement_id?: string;
+          status?: string;
+          title?: string;
+          version_number?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "requirement_versions_requirement_id_fkey";
+            columns: ["requirement_id"];
+            isOneToOne: false;
+            referencedRelation: "requirements";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
