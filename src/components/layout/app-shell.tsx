@@ -18,7 +18,12 @@ export function AppShell({ children }: AppShellProps) {
             <FolderKanban className="size-4 text-muted-foreground" />
             QA Flow Intelligence
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/settings" className="text-sm text-muted-foreground hover:text-foreground">
+              AI Settings
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl px-4 py-10">{children}</main>
