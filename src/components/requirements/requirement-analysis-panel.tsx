@@ -3,10 +3,13 @@
 import { useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { PlatformSelector } from "./platform-selector";
+import type { PlatformKind } from "@/lib/platform/types";
 
 type RequirementAnalysisPanelProps = {
   requirementId: string;
   projectId: string;
+  defaultPlatforms: PlatformKind[];
 };
 
 type AnalysisState = {
@@ -18,18 +21,20 @@ type AnalysisState = {
 export function RequirementAnalysisPanel({
   requirementId,
   projectId,
+  defaultPlatforms,
 }: RequirementAnalysisPanelProps) {
   const [state, setState] = useState<AnalysisState>({ status: "idle" });
+  const [platforms, setPlatforms] = useState<PlatformKind[]>(defaultPlatforms);
   const [isPending, startTransition] = useTransition();
   const canRetry = useMemo(() => state.status === "error" || state.status === "success", [state.status]);
 
   async function runAnalysis() {
     setState({ status: "loading" });
 
-    const response = await fetch("/api/requirements/analyze", {
+      const response = await fetch("/api/requirements/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requirementId, projectId }),
+      body: JSON.stringify({ requirementId, projectId, platforms }),
     });
 
     const payload = (await response.json().catch(() => null)) as
@@ -58,6 +63,11 @@ export function RequirementAnalysisPanel({
         <p className="text-sm text-muted-foreground">
           Check for ambiguity, missing details, and edge cases.
         </p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">Platform</p>
+        <PlatformSelector value={platforms} onChange={setPlatforms} />
       </div>
 
       <div className="flex items-center gap-3">

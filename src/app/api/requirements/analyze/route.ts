@@ -2,8 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getPrompt } from "@/lib/ai/prompts/registry";
 import { hashAiInput } from "@/lib/ai/hash";
-import { runGeminiRequirementAnalysis } from "@/lib/ai/providers/gemini";
+import { runGeminiMessages } from "@/lib/ai/providers/gemini";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDefaultRequirementPlatforms } from "@/lib/ai/prompts/requirement-analysis/v1";
+import type { PlatformKind } from "@/lib/platform/types";
 
 export async function POST(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
@@ -15,6 +17,9 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const requirementId = typeof body?.requirementId === "string" ? body.requirementId : "";
+  const platforms = Array.isArray(body?.platforms)
+    ? body.platforms.filter((platform: unknown): platform is PlatformKind => platform === "web" || platform === "mobile")
+    : [];
 
   if (!requirementId) {
     return NextResponse.json({ error: "missing_requirement_id" }, { status: 400 });
@@ -39,6 +44,7 @@ export async function POST(request: NextRequest) {
     title: requirement.title,
     description: requirement.description,
     projectName: project.name,
+    platforms: platforms.length > 0 ? platforms : getDefaultRequirementPlatforms(requirement),
   };
 
   if (!prompt.validateInput(input)) {
@@ -84,7 +90,7 @@ export async function POST(request: NextRequest) {
   const startedAt = Date.now();
 
   try {
-    const analysis = await runGeminiRequirementAnalysis(input, {
+    const analysis = await runGeminiMessages(prompt.buildMessages(input), {
       apiKey,
       model: "gemini-1.5-flash",
     });
