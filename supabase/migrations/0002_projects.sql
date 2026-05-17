@@ -1,5 +1,7 @@
 create extension if not exists pgcrypto;
 
+grant usage on schema public to anon, authenticated;
+
 create table if not exists public.projects (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -10,6 +12,10 @@ create table if not exists public.projects (
 );
 
 create index if not exists projects_owner_id_idx on public.projects(owner_id);
+
+grant select, insert, update, delete
+on table public.projects
+to authenticated;
 
 alter table public.projects enable row level security;
 
