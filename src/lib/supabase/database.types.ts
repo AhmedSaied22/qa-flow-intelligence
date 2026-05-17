@@ -1,3 +1,5 @@
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
 export type Database = {
   public: {
     Tables: {
@@ -202,7 +204,6 @@ export type Database = {
           model: string;
           owner_id: string;
           provider: string;
-          प्रतिक्रिया?: never;
           response_time_ms: number | null;
           source: string;
           tokens_in: number;
@@ -233,6 +234,69 @@ export type Database = {
           source?: string;
           tokens_in?: number;
           tokens_out?: number;
+        };
+        Relationships: [];
+      };
+      ai_generations: {
+        Row: {
+          cache_status: string;
+          created_at: string;
+          error_code: string | null;
+          error_message: string | null;
+          generation_type: string;
+          id: string;
+          input_hash: string;
+          model: string;
+          owner_id: string;
+          output_json: Json | null;
+          prompt_version: string;
+          provider: string;
+          response_time_ms: number | null;
+          status: string;
+          token_input: number | null;
+          token_output: number | null;
+          estimated_cost: number | null;
+          updated_at: string;
+        };
+        Insert: {
+          cache_status?: string;
+          created_at?: string;
+          error_code?: string | null;
+          error_message?: string | null;
+          generation_type: string;
+          id?: string;
+          input_hash: string;
+          model: string;
+          owner_id: string;
+          output_json?: Json | null;
+          prompt_version: string;
+          provider: string;
+          response_time_ms?: number | null;
+          status: string;
+          token_input?: number | null;
+          token_output?: number | null;
+          estimated_cost?: number | null;
+          updated_at?: string;
+        };
+        Update: {
+          cache_status?: string;
+          created_at?: string;
+          error_code?: string | null;
+          error_message?: string | null;
+          generation_type?: string;
+          id?: string;
+          input_hash?: string;
+          model?: string;
+          owner_id?: string;
+          output_json?: Json | null;
+          prompt_version?: string;
+          provider?: string;
+          response_time_ms?: number | null;
+          status?: string;
+          token_input?: number | null;
+          token_output?: number | null;
+          estimated_cost?: number | null;
+          updated_at?: string;
         };
         Relationships: [];
       };

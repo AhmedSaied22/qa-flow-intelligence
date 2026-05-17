@@ -116,7 +116,7 @@ export default async function ProjectRequirementsPage({
         ) : (
           <div className="grid gap-3">
             {requirements.map((requirement) => (
-              <RequirementCard key={requirement.id} requirement={requirement} />
+              <RequirementCard key={requirement.id} requirement={requirement} projectId={project.id} />
             ))}
           </div>
         )}
