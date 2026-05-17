@@ -20,6 +20,7 @@ export type RequirementAnalysisOutput = {
     platform: PlatformKind;
     highlights: string[];
   }>;
+  suggested_test_case_count: number;
 };
 
 function isStringArray(value: unknown): value is string[] {
@@ -35,6 +36,7 @@ function isOutput(value: unknown): value is RequirementAnalysisOutput {
     isStringArray(record.ambiguities) &&
     isStringArray(record.missing_details) &&
     isStringArray(record.edge_cases) &&
+    typeof record.suggested_test_case_count === "number" &&
     Array.isArray(record.platform_focus) &&
     record.platform_focus.every((item) => {
       if (typeof item !== "object" || item === null) return false;
@@ -55,7 +57,7 @@ export const requirementAnalysisPrompt: PromptModule<
   version: "v1",
   task: "Analyze requirements for ambiguity, missing details, and risk.",
   modelTier: "medium",
-  maxOutputTokens: 800,
+  maxOutputTokens: 2000,
   cachePolicy: "reuse",
   validateInput(input): input is RequirementAnalysisInput {
     if (typeof input !== "object" || input === null) return false;
@@ -73,8 +75,27 @@ export const requirementAnalysisPrompt: PromptModule<
     return [
       {
         role: "system",
-        content:
-          "Return only valid JSON for requirement analysis with summary, risk_level, ambiguities, missing_details, and edge_cases.",
+        content: [
+          "Return JSON only. Do not use markdown. Do not include explanations outside the JSON object.",
+          "Return this exact JSON shape:",
+          "{",
+          '  "summary": "string",',
+          '  "risk_level": "low" | "medium" | "high",',
+          '  "ambiguities": ["string"],',
+          '  "missing_details": ["string"],',
+          '  "edge_cases": ["string"],',
+          '  "suggested_test_case_count": number,',
+          '  "platform_focus": [',
+          '    { "platform": "web", "highlights": ["string"] },',
+          '    { "platform": "mobile", "highlights": ["string"] }',
+          "  ]",
+          "}",
+          "Rules: risk_level must be lowercase only: low, medium, or high.",
+          "suggested_test_case_count must be a number, not a string.",
+          "ambiguities, missing_details, and edge_cases must be arrays of strings only. Do not put nested objects in those arrays.",
+          "If a section has no items, return an empty array.",
+          "platform_focus must always be an array. Include only web/mobile platform objects with highlights as strings.",
+        ].join("\n"),
       },
       {
         role: "user",

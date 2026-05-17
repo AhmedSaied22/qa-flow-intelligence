@@ -1,5 +1,7 @@
 create extension if not exists pgcrypto;
 
+grant usage on schema public to anon, authenticated;
+
 create table if not exists public.requirements (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
@@ -29,6 +31,14 @@ on public.requirement_versions(requirement_id, version_number);
 
 alter table public.requirements enable row level security;
 alter table public.requirement_versions enable row level security;
+
+grant select, insert, update, delete
+on table public.requirements
+to authenticated;
+
+grant select, insert, update, delete
+on table public.requirement_versions
+to authenticated;
 
 drop trigger if exists requirements_touch_updated_at on public.requirements;
 

@@ -1,10 +1,13 @@
 create extension if not exists pgcrypto;
 
+grant usage on schema public to anon, authenticated;
+
 create table if not exists public.ai_provider_settings (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
   provider text not null default 'gemini',
   use_byok boolean not null default false,
+  gemini_model text not null default 'gemini-flash-latest',
   gemini_api_key text,
   gemini_free_quota_limit integer not null default 0,
   gemini_free_quota_used integer not null default 0,
@@ -16,6 +19,10 @@ create unique index if not exists ai_provider_settings_owner_id_key
 on public.ai_provider_settings(owner_id);
 
 alter table public.ai_provider_settings enable row level security;
+
+grant select, insert, update, delete
+on table public.ai_provider_settings
+to authenticated;
 
 drop trigger if exists ai_provider_settings_touch_updated_at on public.ai_provider_settings;
 
