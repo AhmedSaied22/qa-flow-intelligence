@@ -1,24 +1,21 @@
-import type {
-  RequirementAnalysisInput,
-  RequirementAnalysisOutput,
-} from "../prompts/requirement-analysis/v1";
+import type { RequirementAnalysisOutput } from "../prompts/requirement-analysis/v1";
 
 type GeminiSettings = {
   apiKey: string;
   model: string;
 };
 
-export async function runGeminiRequirementAnalysis(
-  input: RequirementAnalysisInput,
-  settings: GeminiSettings,
-) {
+type ProviderMessage = {
+  role: "system" | "user";
+  content: string;
+};
+
+export async function runGeminiMessages(messages: ProviderMessage[], settings: GeminiSettings) {
   const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: JSON.stringify(input) }],
-      },
-    ],
+    contents: messages.map((message) => ({
+      role: message.role,
+      parts: [{ text: message.content }],
+    })),
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.2,

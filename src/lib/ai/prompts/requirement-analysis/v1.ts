@@ -1,9 +1,13 @@
 import type { PromptModule } from "@/lib/ai/types";
+import { buildPlatformIntelligenceFragment } from "@/lib/ai/prompts/fragments/platform-intelligence";
+import type { PlatformKind } from "@/lib/platform/types";
+import { getDefaultPlatformSelection } from "@/lib/platform/helpers";
 
 export type RequirementAnalysisInput = {
   title: string;
   description: string | null;
   projectName: string;
+  platforms: PlatformKind[];
 };
 
 export type RequirementAnalysisOutput = {
@@ -12,6 +16,10 @@ export type RequirementAnalysisOutput = {
   ambiguities: string[];
   missing_details: string[];
   edge_cases: string[];
+  platform_focus: Array<{
+    platform: PlatformKind;
+    highlights: string[];
+  }>;
 };
 
 function isStringArray(value: unknown): value is string[] {
@@ -26,7 +34,16 @@ function isOutput(value: unknown): value is RequirementAnalysisOutput {
     ["low", "medium", "high"].includes(String(record.risk_level)) &&
     isStringArray(record.ambiguities) &&
     isStringArray(record.missing_details) &&
-    isStringArray(record.edge_cases)
+    isStringArray(record.edge_cases) &&
+    Array.isArray(record.platform_focus) &&
+    record.platform_focus.every((item) => {
+      if (typeof item !== "object" || item === null) return false;
+      const platformRecord = item as Record<string, unknown>;
+      return (
+        (platformRecord.platform === "web" || platformRecord.platform === "mobile") &&
+        isStringArray(platformRecord.highlights)
+      );
+    })
   );
 }
 
@@ -46,7 +63,9 @@ export const requirementAnalysisPrompt: PromptModule<
     return (
       typeof record.title === "string" &&
       typeof record.projectName === "string" &&
-      (record.description === null || typeof record.description === "string")
+      (record.description === null || typeof record.description === "string") &&
+      Array.isArray(record.platforms) &&
+      record.platforms.every((platform) => platform === "web" || platform === "mobile")
     );
   },
   validateOutput: isOutput,
@@ -59,8 +78,18 @@ export const requirementAnalysisPrompt: PromptModule<
       },
       {
         role: "user",
-        content: JSON.stringify(input),
+        content: [
+          JSON.stringify(input),
+          buildPlatformIntelligenceFragment(input.platforms),
+        ].join("\n\n"),
       },
     ];
   },
 };
+
+export function getDefaultRequirementPlatforms(input: {
+  title: string;
+  description: string | null;
+}) {
+  return getDefaultPlatformSelection([input.title, input.description ?? ""].join(" "));
+}

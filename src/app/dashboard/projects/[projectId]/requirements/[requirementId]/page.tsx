@@ -3,9 +3,11 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PlatformBadges } from "@/components/requirements/platform-badges";
 import { RequirementAnalysisPanel } from "@/components/requirements/requirement-analysis-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDefaultRequirementPlatforms } from "@/lib/ai/prompts/requirement-analysis/v1";
 
 export default async function RequirementPage({
   params,
@@ -43,7 +45,13 @@ export default async function RequirementPage({
           <p className="text-sm text-muted-foreground">{requirement.description || "No description yet."}</p>
         </div>
 
-        <RequirementAnalysisPanel requirementId={requirement.id} projectId={project.id} />
+        <PlatformBadges platforms={getDefaultRequirementPlatforms(requirement)} />
+
+        <RequirementAnalysisPanel
+          requirementId={requirement.id}
+          projectId={project.id}
+          defaultPlatforms={getDefaultRequirementPlatforms(requirement)}
+        />
       </section>
     </AppShell>
   );
