@@ -20,6 +20,7 @@ export type TestCaseGenerationInput = {
   requirementDescription: string | null;
   requirementAnalysis: RequirementAnalysisSummary;
   platforms: PlatformKind[];
+  limit: 5 | 10 | 20;
 };
 
 export type GeneratedTestCase = {
@@ -47,7 +48,7 @@ function isStringArray(value: unknown): value is string[] {
 function isOutput(value: unknown): value is TestCaseGenerationOutput {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return Array.isArray(record.test_cases) && record.test_cases.length > 0 && record.test_cases.length <= 10 && record.test_cases.every((item) => {
+  return Array.isArray(record.test_cases) && record.test_cases.length > 0 && record.test_cases.length <= 20 && record.test_cases.every((item) => {
     if (typeof item !== "object" || item === null) return false;
     const testCase = item as Record<string, unknown>;
     return (
@@ -70,7 +71,7 @@ export const testCaseGenerationPrompt: PromptModule<
   TestCaseGenerationOutput
 > = {
   id: "test-case-generation",
-  version: "v2",
+  version: "v3",
   task: "Generate practical test cases from requirement analysis.",
   modelTier: "medium",
   maxOutputTokens: 3600,
@@ -84,6 +85,7 @@ export const testCaseGenerationPrompt: PromptModule<
       (record.requirementDescription === null || typeof record.requirementDescription === "string") &&
       typeof record.requirementAnalysis === "object" &&
       record.requirementAnalysis !== null &&
+      (record.limit === 5 || record.limit === 10 || record.limit === 20) &&
       Array.isArray(record.platforms) &&
       record.platforms.every((platform) => platform === "web" || platform === "mobile")
     );
@@ -96,8 +98,8 @@ export const testCaseGenerationPrompt: PromptModule<
         content:
           [
             "Return JSON only. No markdown, no explanations, no code fences.",
-            "Return compact JSON with test_cases as an array of at most 10 practical QA test cases.",
-            "Do not exceed 10 test cases.",
+            `Return compact JSON with test_cases as an array of at most ${input.limit} practical QA test cases.`,
+            `Do not exceed ${input.limit} test cases.`,
             "Use short descriptions and short steps.",
             "Do not generate automation code.",
             "Do not duplicate similar cases across platforms.",

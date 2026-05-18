@@ -39,19 +39,34 @@ export default async function RequirementPage({
     .limit(1)
     .maybeSingle();
 
+  const { data: savedTestCases } = await supabase
+    .from("test_cases")
+    .select("*")
+    .eq("requirement_id", requirementId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
+
+  const generationIds = Array.from(
+    new Set((savedTestCases ?? []).map((item) => item.ai_generation_id).filter((id): id is string => typeof id === "string")),
+  );
+  const { data: savedGenerations } =
+    generationIds.length > 0
+      ? await supabase.from("ai_generations").select("id,provider,model").in("id", generationIds)
+      : { data: [] };
+
   if (!project || !requirement || project.owner_id !== userData.user.id || requirement.owner_id !== userData.user.id) {
     notFound();
   }
 
   return (
     <AppShell>
-      <section className="space-y-6">
+      <section className="space-y-5">
         <Link className={buttonVariants({ variant: "ghost", size: "sm" }) + " px-2"} href={`/dashboard/projects/${projectId}`}>
           <ArrowLeft className="size-4" />
           Back
         </Link>
 
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <p className="text-sm text-muted-foreground">Requirement</p>
           <h1 className="text-2xl font-semibold tracking-tight">{requirement.title}</h1>
           <p className="text-sm text-muted-foreground">{requirement.description || "No description yet."}</p>
@@ -71,6 +86,14 @@ export default async function RequirementPage({
           projectId={project.id}
           defaultPlatforms={getDefaultRequirementPlatforms(requirement)}
           hasSavedAnalysis={Boolean(requirementAnalysisGeneration?.output_json)}
+          initialSavedTestCases={(savedTestCases ?? []).map((testCase) => {
+            const generation = savedGenerations?.find((item) => item.id === testCase.ai_generation_id);
+            return {
+              ...testCase,
+              provider: generation?.provider ?? null,
+              model: generation?.model ?? null,
+            };
+          })}
         />
       </section>
     </AppShell>

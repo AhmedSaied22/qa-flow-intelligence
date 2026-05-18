@@ -26,8 +26,8 @@ function getTestCaseGenerationValidationErrors(value: unknown) {
     errors.push("test_cases must include at least one item.");
   }
 
-  if (record.test_cases.length > 10) {
-    errors.push("test_cases must not exceed 10 items.");
+  if (record.test_cases.length > 20) {
+    errors.push("test_cases must not exceed 20 items.");
   }
 
   record.test_cases.forEach((item, index) => {
@@ -95,7 +95,7 @@ function normalizeGeneratedTitle(value: string) {
   return value.trim().toLowerCase();
 }
 
-function normalizeTestCaseGenerationOutput(value: unknown) {
+function normalizeTestCaseGenerationOutput(value: unknown, limit: 5 | 10 | 20) {
   const sourceRecord =
     Array.isArray(value) ? { test_cases: value } : typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 
@@ -104,7 +104,7 @@ function normalizeTestCaseGenerationOutput(value: unknown) {
   return {
     ...sourceRecord,
     test_cases: Array.isArray(sourceRecord.test_cases)
-      ? sourceRecord.test_cases.slice(0, 10).map((item) => {
+      ? sourceRecord.test_cases.slice(0, limit).map((item) => {
           if (typeof item !== "object" || item === null) return item;
           const testCase = item as Record<string, unknown>;
           const steps =
@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const requirementId = typeof body?.requirementId === "string" ? body.requirementId : "";
+  const limit = body?.limit === 5 || body?.limit === 10 || body?.limit === 20 ? body.limit : 10;
   const platforms = Array.isArray(body?.platforms)
     ? body.platforms.filter((platform: unknown): platform is PlatformKind => platform === "web" || platform === "mobile")
     : [];
@@ -254,6 +255,7 @@ export async function POST(request: NextRequest) {
     requirementDescription: requirement.description,
     requirementAnalysis: analysis,
     platforms: selectedPlatforms,
+    limit,
   };
 
   if (!prompt.validateInput(input)) {
@@ -338,9 +340,9 @@ export async function POST(request: NextRequest) {
     const response = await runGeminiMessages<TestCaseGenerationOutput>(generationPrompt, {
       apiKey,
       model,
-      maxOutputTokens: 4200,
+      maxOutputTokens: limit === 5 ? 2600 : limit === 10 ? 4200 : 7000,
     });
-    const preview = normalizeTestCaseGenerationOutput(response);
+    const preview = normalizeTestCaseGenerationOutput(response, limit);
 
     if (!prompt.validateOutput(preview)) {
       const validationErrors = getTestCaseGenerationValidationErrors(preview);

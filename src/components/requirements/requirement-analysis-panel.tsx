@@ -113,10 +113,10 @@ function RequirementAnalysisResult({ analysis }: { analysis: unknown }) {
 
   const riskClassName =
     analysis.risk_level === "high"
-      ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+      ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
       : analysis.risk_level === "medium"
-        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+        ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+        : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300";
 
   return (
     <div className="space-y-4">
@@ -124,7 +124,21 @@ function RequirementAnalysisResult({ analysis }: { analysis: unknown }) {
         <Badge variant="secondary" className={riskClassName}>
           {analysis.risk_level} risk
         </Badge>
-        <Badge variant="secondary">{analysis.suggested_test_case_count} suggested cases</Badge>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="rounded-md border bg-muted/10 px-3 py-2">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Core coverage</p>
+          <p className="text-sm font-medium">5 cases</p>
+        </div>
+        <div className="rounded-md border bg-muted/10 px-3 py-2">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Recommended suite</p>
+          <p className="text-sm font-medium">10 cases</p>
+        </div>
+        <div className="rounded-md border bg-muted/10 px-3 py-2">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Extended</p>
+          <p className="text-sm font-medium">Full coverage available</p>
+        </div>
       </div>
 
       <AnalysisSection title="Summary">

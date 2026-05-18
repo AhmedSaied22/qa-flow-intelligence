@@ -24,11 +24,12 @@ export async function POST(request: NextRequest) {
       }
     }
   }
+  const uniqueSelectedIndexes = Array.from(new Set(selectedIndexes));
 
-  if (!generationId || selectedIndexes.length === 0) {
+  if (!generationId || uniqueSelectedIndexes.length === 0) {
     console.info("Test case save validation failed", {
       generationIdPresent: Boolean(generationId),
-      selectedIndexesCount: selectedIndexes.length,
+      selectedIndexesCount: uniqueSelectedIndexes.length,
     });
     return NextResponse.json({ error: "missing_selection" }, { status: 400 });
   }
@@ -62,14 +63,14 @@ export async function POST(request: NextRequest) {
     }>;
   };
 
-  const selectedCases = selectedIndexes
+  const selectedCases = uniqueSelectedIndexes
     .map((index: number) => preview.test_cases[index])
     .filter(Boolean);
 
   if (selectedCases.length === 0) {
     console.info("Test case save selection empty after filtering", {
       generationId,
-      selectedIndexes,
+      selectedIndexes: uniqueSelectedIndexes,
     });
     return NextResponse.json({ error: "no_cases_selected" }, { status: 400 });
   }
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
   );
 
   const inserted: Array<{ title: string; skipped: boolean }> = [];
+  const failures: Array<{ title: string; reason: string }> = [];
 
   for (const testCase of selectedCases) {
     if (!generation.project_id || !generation.requirement_id) {
@@ -141,6 +143,7 @@ export async function POST(request: NextRequest) {
           { status: 403 },
         );
       }
+      failures.push({ title: testCase.title, reason: error?.code ?? "insert_failed" });
       continue;
     }
 
@@ -164,10 +167,38 @@ export async function POST(request: NextRequest) {
         details: versionError.details,
         testCaseId: createdCase.id,
       });
+      failures.push({ title: createdCase.title, reason: versionError.code ?? "version_insert_failed" });
     }
 
     inserted.push({ title: createdCase.title, skipped: false });
   }
 
-  return NextResponse.json({ saved: inserted.filter((item) => !item.skipped).length, skipped: inserted.filter((item) => item.skipped).length, items: inserted });
+  const saved = inserted.filter((item) => !item.skipped).length;
+  const skipped = inserted.filter((item) => item.skipped).length;
+
+  if (failures.length > 0 && saved === 0) {
+    return NextResponse.json(
+      {
+        error: "save_failed",
+        message: "Selected test cases could not be saved. Check server logs for safe Supabase error details.",
+        saved,
+        skipped,
+        failures,
+      },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({
+    saved,
+    skipped,
+    failures: failures.length,
+    message:
+      saved > 0
+        ? `${saved} test cases saved to the living test suite.`
+        : skipped > 0
+          ? "Selected test cases are already saved in the living test suite."
+          : "No new test cases were saved.",
+    items: inserted,
+  });
 }
