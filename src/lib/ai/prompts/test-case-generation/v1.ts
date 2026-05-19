@@ -27,6 +27,7 @@ export type GeneratedTestCase = {
   id?: string;
   title: string;
   type?: string;
+  priority?: "critical" | "high" | "medium" | "low";
   description: string;
   preconditions: string;
   steps: string[];
@@ -60,6 +61,7 @@ function isOutput(value: unknown): value is TestCaseGenerationOutput {
       (testCase.platform === "web" || testCase.platform === "mobile") &&
       ["low", "medium", "high"].includes(String(testCase.risk_level)) &&
       (testCase.type === undefined || typeof testCase.type === "string") &&
+      (testCase.priority === undefined || ["critical", "high", "medium", "low"].includes(String(testCase.priority))) &&
       (testCase.test_data === undefined || isStringArray(testCase.test_data)) &&
       (testCase.automation_candidate === undefined || typeof testCase.automation_candidate === "string")
     );
@@ -103,7 +105,8 @@ export const testCaseGenerationPrompt: PromptModule<
             "Use short descriptions and short steps.",
             "Do not generate automation code.",
             "Do not duplicate similar cases across platforms.",
-            "Each test case object should include title, description, preconditions, steps, expected_result, platform, and risk_level.",
+            "Each test case object should include title, description, preconditions, steps, expected_result, platform, risk_level, and priority.",
+            "Priority must be one of: critical, high, medium, low. Severity risk_level must be one of: high, medium, low.",
             "If helpful, include optional compact fields: type, test_data, automation_candidate.",
             "If present, automation_candidate must be a short string, not an object.",
             "Keep each step short.",

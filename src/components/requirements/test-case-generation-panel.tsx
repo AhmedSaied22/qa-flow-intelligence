@@ -15,6 +15,7 @@ type PreviewTestCase = {
   id?: string;
   title: string;
   type?: string;
+  priority?: "critical" | "high" | "medium" | "low";
   description: string;
   preconditions: string;
   steps: string[];
@@ -91,15 +92,25 @@ function normalizeType(type?: string) {
   return value || "functional";
 }
 
-function priorityLabel(riskLevel: PreviewTestCase["risk_level"]) {
-  if (riskLevel === "high") return "Critical";
-  if (riskLevel === "medium") return "High";
+function priorityFromRisk(riskLevel: PreviewTestCase["risk_level"]): "critical" | "high" | "low" {
+  if (riskLevel === "high") return "critical";
+  if (riskLevel === "medium") return "high";
+  return "low";
+}
+
+function priorityLabel(item: PreviewTestCase) {
+  const priority = item.priority ?? priorityFromRisk(item.risk_level);
+  if (priority === "critical") return "Critical";
+  if (priority === "high") return "High";
+  if (priority === "medium") return "Medium";
   return "Low";
 }
 
-function priorityClassName(riskLevel: PreviewTestCase["risk_level"]) {
-  if (riskLevel === "high") return "border-rose-200 bg-rose-50 text-rose-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300";
-  if (riskLevel === "medium") return "border-orange-200 bg-orange-50 text-orange-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300";
+function priorityClassName(item: PreviewTestCase) {
+  const priority = item.priority ?? priorityFromRisk(item.risk_level);
+  if (priority === "critical") return "border-rose-200 bg-rose-50 text-rose-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300";
+  if (priority === "high") return "border-orange-200 bg-orange-50 text-orange-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300";
+  if (priority === "medium") return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300";
   return "border-slate-200 bg-slate-50 text-slate-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300";
 }
 
@@ -177,6 +188,7 @@ function toPreviewFromSaved(item: SavedTestCase): PreviewTestCase {
     expected_result: item.expected_result ?? "",
     platform: item.platform === "web" ? "web" : "mobile",
     risk_level: item.risk_level === "high" || item.risk_level === "medium" || item.risk_level === "low" ? item.risk_level : "medium",
+    priority: undefined,
     status: "saved",
   };
 }
@@ -345,11 +357,22 @@ export function TestCaseGenerationPanel({
 
     setState((current) => ({ ...current, status: "saving", message: undefined }));
 
-    const response = await fetch("/api/test-cases/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ generationId: state.generationId, selectedIndexes }),
-    });
+    let response: Response;
+    try {
+      response = await fetch("/api/test-cases/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generationId: state.generationId, selectedIndexes }),
+      });
+    } catch (error) {
+      console.error("Save selected test cases request failed", error);
+      setState((current) => ({
+        ...current,
+        status: "error",
+        message: "Connection lost. Selected test cases were not saved yet. Please reconnect and try again.",
+      }));
+      return;
+    }
 
     const payload = (await response.json().catch(() => null)) as SaveResponse | null;
 
@@ -654,8 +677,8 @@ export function TestCaseGenerationPanel({
                             <p className="truncate text-sm font-medium">{item.title}</p>
                             <p className="truncate text-xs text-muted-foreground">{item.description}</p>
                       </div>
-                      <Badge variant="secondary" className={cn("w-fit", priorityClassName(item.risk_level))}>
-                        {priorityLabel(item.risk_level)}
+                      <Badge variant="secondary" className={cn("w-fit", priorityClassName(item))}>
+                        {priorityLabel(item)}
                       </Badge>
                       <Badge variant="secondary" className="w-fit capitalize">
                         {item.platform}
@@ -814,8 +837,8 @@ export function TestCaseGenerationPanel({
             </div>
 
             <div className="flex flex-wrap gap-2 border-b px-5 py-3">
-              <Badge variant="secondary" className={cn("w-fit", priorityClassName(currentItem.risk_level))}>
-                {priorityLabel(currentItem.risk_level)}
+              <Badge variant="secondary" className={cn("w-fit", priorityClassName(currentItem))}>
+                {priorityLabel(currentItem)}
               </Badge>
               <Badge variant="secondary" className="capitalize">
                 {currentItem.platform}

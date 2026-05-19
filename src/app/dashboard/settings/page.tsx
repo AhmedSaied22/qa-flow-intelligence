@@ -42,7 +42,7 @@ async function saveGeminiSettings(formData: FormData) {
       provider: "gemini",
       use_byok: useByok,
       gemini_model: GEMINI_MODELS.includes(model as (typeof GEMINI_MODELS)[number]) ? model : "gemini-flash-latest",
-      gemini_api_key: apiKey || null,
+      gemini_api_key: apiKey || currentSettings?.gemini_api_key || null,
       gemini_free_quota_limit: Number.isFinite(quotaLimit) ? quotaLimit : currentSettings?.gemini_free_quota_limit ?? 0,
       gemini_free_quota_used: useByok ? 0 : currentSettings?.gemini_free_quota_used ?? 0,
     },
@@ -99,7 +99,7 @@ export default async function AiProviderSettingsPage({ searchParams }: AiProvide
   }
 
   const [settingsResult, usageResult] = await Promise.all([
-    supabase.from("ai_provider_settings").select("*").maybeSingle(),
+    supabase.from("ai_provider_settings").select("*").eq("owner_id", userData.user.id).maybeSingle(),
     supabase.from("ai_usage_events").select("*").eq("owner_id", userData.user.id).order("created_at", { ascending: false }).limit(10),
   ]);
 
@@ -117,6 +117,7 @@ export default async function AiProviderSettingsPage({ searchParams }: AiProvide
         : params?.error === "save-failed"
           ? "Settings could not be saved. Please try again."
           : null;
+
   const recentGenerationIds = usageEvents.map((event) => event.ai_generation_id).filter((id): id is string => Boolean(id));
   const { data: recentGenerations } = recentGenerationIds.length
     ? await supabase
@@ -133,42 +134,61 @@ export default async function AiProviderSettingsPage({ searchParams }: AiProvide
       connection: settings?.gemini_api_key ? "Ready" : "Not connected",
       model: selectedModel,
       byok: usingByok ? "On" : "Off",
-      hint: settings?.gemini_api_key ? "Saved key: ••••" : "No saved Gemini key yet",
+      hint: settings?.gemini_api_key ? "Saved key: masked" : "No saved Gemini key yet",
       activeCard: true,
     },
-    { key: "openai", name: "OpenAI", status: "Coming soon", connection: "Not available", model: "—", byok: "—", hint: "Future provider slot", activeCard: false },
-    { key: "claude", name: "Claude", status: "Coming soon", connection: "Not available", model: "—", byok: "—", hint: "Future provider slot", activeCard: false },
-    { key: "openrouter", name: "OpenRouter", status: "Coming soon", connection: "Not available", model: "—", byok: "—", hint: "Future provider slot", activeCard: false },
-    { key: "ollama", name: "Ollama Local", status: "Coming soon", connection: "Not available", model: "—", byok: "—", hint: "Future provider slot", activeCard: false },
+    { key: "openai", name: "OpenAI", status: "Coming soon", connection: "Not available", model: "-", byok: "-", hint: "Future provider slot", activeCard: false },
+    { key: "claude", name: "Claude", status: "Coming soon", connection: "Not available", model: "-", byok: "-", hint: "Future provider slot", activeCard: false },
+    { key: "openrouter", name: "OpenRouter", status: "Coming soon", connection: "Not available", model: "-", byok: "-", hint: "Future provider slot", activeCard: false },
+    { key: "ollama", name: "Ollama Local", status: "Coming soon", connection: "Not available", model: "-", byok: "-", hint: "Future provider slot", activeCard: false },
   ] as const;
 
   return (
     <AppShell>
       <section className="space-y-6">
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">AI Provider Settings</p>
-          <h1 className="text-2xl font-semibold tracking-tight">AI Providers</h1>
-          <p className="text-sm text-muted-foreground">Configure active providers and review recent usage.</p>
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border/70 pb-5">
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">AI Provider Settings</p>
+            <h1 className="text-3xl font-semibold tracking-tight">AI Providers</h1>
+            <p className="max-w-2xl text-sm text-muted-foreground">Manage server-side AI access, BYOK status, and recent generation health.</p>
+          </div>
+          <div className="rounded-lg border border-border/70 bg-muted/10 px-3 py-2 text-sm text-muted-foreground">
+            Gemini is active
+          </div>
         </div>
 
-        <div className="grid gap-3">
+        {params?.saved ? (
+          <div className="rounded-lg border border-emerald-300/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+            Provider settings saved.
+          </div>
+        ) : null}
+
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
           {providerCards.map((provider) => (
-            <article key={provider.key} className={cn("rounded-lg border p-4", provider.activeCard ? "bg-background" : "bg-muted/20")}>
+            <article
+              key={provider.key}
+              className={cn(
+                "rounded-xl border border-border/70 p-4 transition-colors",
+                provider.activeCard ? "bg-background/80 lg:row-span-4" : "bg-muted/10 hover:bg-muted/15",
+              )}
+            >
               <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{provider.name}</p>
-                  <p className="text-sm text-muted-foreground">Status: {provider.status}</p>
-                  <p className="text-sm text-muted-foreground">Connection: {provider.connection}</p>
-                  <p className="text-sm text-muted-foreground">Model: {provider.model}</p>
-                  <p className="text-sm text-muted-foreground">BYOK: {provider.byok}</p>
-                  <p className="text-sm text-muted-foreground">{provider.hint}</p>
+                <div className="space-y-2">
+                  <p className="text-base font-semibold">{provider.name}</p>
+                  <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+                    <span>Status: {provider.status}</span>
+                    <span>Connection: {provider.connection}</span>
+                    <span>Model: {provider.model}</span>
+                    <span>BYOK: {provider.byok}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground/90">{provider.hint}</p>
                   {provider.activeCard && providerError ? <p className="text-sm text-destructive">{providerError}</p> : null}
                 </div>
                 <span
                   className={cn(
                     "rounded-full border px-2 py-1 text-xs",
                     provider.activeCard && settings?.gemini_api_key
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                       : "border-muted bg-muted/30 text-muted-foreground",
                   )}
                 >
@@ -177,7 +197,7 @@ export default async function AiProviderSettingsPage({ searchParams }: AiProvide
               </div>
 
               {provider.activeCard ? (
-                <form action={saveGeminiSettings} className="mt-4 space-y-4">
+                <form action={saveGeminiSettings} className="mt-5 space-y-4 border-t border-border/70 pt-4">
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="space-y-2">
                       <span className="text-sm font-medium">Gemini API key</span>
@@ -185,7 +205,7 @@ export default async function AiProviderSettingsPage({ searchParams }: AiProvide
                         name="geminiApiKey"
                         type="password"
                         placeholder={settings?.gemini_api_key ? "Replace Gemini API key" : "Paste your Gemini API key"}
-                        className="h-8 w-full rounded-md border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                        className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     </label>
 
@@ -194,7 +214,7 @@ export default async function AiProviderSettingsPage({ searchParams }: AiProvide
                       <select
                         name="geminiModel"
                         defaultValue={selectedModel}
-                        className="h-8 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <option value="gemini-flash-latest">gemini-flash-latest</option>
                         <option value="gemini-2.5-pro">gemini-2.5-pro</option>
@@ -209,11 +229,11 @@ export default async function AiProviderSettingsPage({ searchParams }: AiProvide
                           type="number"
                           min={0}
                           defaultValue={quotaLimit}
-                          className="h-8 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         />
                       </label>
                     ) : (
-                      <div className="space-y-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                      <div className="rounded-md border border-dashed border-border/80 bg-muted/10 p-3 text-sm text-muted-foreground">
                         Free quota applies only to platform-managed keys.
                       </div>
                     )}
@@ -229,7 +249,7 @@ export default async function AiProviderSettingsPage({ searchParams }: AiProvide
                     <Button type="submit" formAction={testGeminiConnection} variant="outline">
                       Test connection
                     </Button>
-                    <p className="text-sm text-muted-foreground">No AI calls are made from this page.</p>
+                    <p className="text-sm text-muted-foreground">Connection tests run server-side only.</p>
                   </div>
                 </form>
               ) : null}
@@ -237,7 +257,7 @@ export default async function AiProviderSettingsPage({ searchParams }: AiProvide
           ))}
         </div>
 
-        <section className="rounded-lg border p-4">
+        <section className="rounded-xl border border-border/70 bg-muted/10 p-4">
           <h2 className="text-sm font-medium">Free Gemini usage</h2>
           {usingByok ? (
             <p className="mt-2 text-sm text-muted-foreground">BYOK is enabled, so free quota is not enforced.</p>
@@ -249,7 +269,7 @@ export default async function AiProviderSettingsPage({ searchParams }: AiProvide
           )}
         </section>
 
-        <section className="rounded-lg border p-4">
+        <section className="rounded-xl border border-border/70 bg-muted/10 p-4">
           <h2 className="text-sm font-medium">Recent usage events</h2>
           <div className="mt-3">
             <UsageEventsPanel events={usageEvents} generationMap={generationMap} />
