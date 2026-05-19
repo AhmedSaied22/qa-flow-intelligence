@@ -6,9 +6,51 @@ function normalizeTitle(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizePriority(value: unknown): "critical" | "high" | "medium" | "low" | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "critical" || normalized === "high" || normalized === "medium" || normalized === "low") {
+    return normalized;
+  }
+  return null;
+}
+
+function isRetryableNetworkError(error: { message?: string | null; code?: string | null } | null | undefined) {
+  const message = (error?.message ?? "").toLowerCase();
+  const code = (error?.code ?? "").toLowerCase();
+  return (
+    message.includes("fetch failed") ||
+    message.includes("failed to fetch") ||
+    message.includes("network") ||
+    message.includes("connection") ||
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("retryable") ||
+    message.includes("econnreset") ||
+    message.includes("enotfound") ||
+    code.includes("timeout")
+  );
+}
+
+function saveRequestErrorResponse(error: { message?: string | null; code?: string | null } | null | undefined, fallback: string) {
+  if (isRetryableNetworkError(error)) {
+    return NextResponse.json(
+      { error: "network_error", message: "Connection lost. Selected test cases were not saved yet. Please reconnect and try again." },
+      { status: 503 },
+    );
+  }
+
+  return NextResponse.json({ error: "save_request_failed", message: fallback }, { status: 500 });
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
-  const { data: userData } = await supabase.auth.getUser();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error("Test case save auth check failed", { message: userError.message });
+    return saveRequestErrorResponse(userError, "Could not verify your session. Please try again.");
+  }
 
   if (!userData.user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -34,13 +76,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "missing_selection" }, { status: 400 });
   }
 
-  const { data: generation } = await supabase
+  const { data: generation, error: generationError } = await supabase
     .from("ai_generations")
     .select("*")
     .eq("id", generationId)
     .eq("owner_id", userData.user.id)
     .eq("status", "success")
     .maybeSingle();
+
+  if (generationError) {
+    console.error("Test case save generation lookup failed", {
+      code: generationError.code,
+      message: generationError.message,
+      details: generationError.details,
+      generationId,
+    });
+    return saveRequestErrorResponse(generationError, "Could not load the generated test cases.");
+  }
 
   if (!generation?.output_json || generation.generation_type !== "Generate practical test cases from requirement analysis.") {
     console.info("Test case save generation lookup failed", {
@@ -60,6 +112,10 @@ export async function POST(request: NextRequest) {
       expected_result: string;
       platform: string;
       risk_level: string;
+      priority?: string;
+      type?: string;
+      test_data?: string[];
+      automation_candidate?: string;
     }>;
   };
 
@@ -87,7 +143,7 @@ export async function POST(request: NextRequest) {
       message: existingCasesError.message,
       details: existingCasesError.details,
     });
-    return NextResponse.json({ error: "existing_case_lookup_failed", message: "Could not verify existing saved test cases." }, { status: 500 });
+    return saveRequestErrorResponse(existingCasesError, "Could not verify existing saved test cases.");
   }
 
   const existingKeySet = new Set(
@@ -108,21 +164,29 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
+    const insertPayload = {
+      project_id: generation.project_id,
+      requirement_id: generation.requirement_id,
+      ai_generation_id: generation.id,
+      title: testCase.title,
+      description: testCase.description,
+      preconditions: testCase.preconditions,
+      steps: testCase.steps,
+      expected_result: testCase.expected_result,
+      platform: testCase.platform,
+      risk_level: testCase.risk_level,
+      priority:
+        normalizePriority(testCase.priority) ??
+        (testCase.risk_level === "high" ? "critical" : testCase.risk_level === "medium" ? "high" : "low"),
+      case_type: testCase.type ?? "functional",
+      test_data: testCase.test_data ?? [],
+      automation_candidate: testCase.automation_candidate ?? null,
+      status: "active",
+    };
+
     const { data: createdCase, error } = await supabase
       .from("test_cases")
-      .insert({
-        project_id: generation.project_id,
-        requirement_id: generation.requirement_id,
-        ai_generation_id: generation.id,
-        title: testCase.title,
-        description: testCase.description,
-        preconditions: testCase.preconditions,
-        steps: testCase.steps,
-        expected_result: testCase.expected_result,
-        platform: testCase.platform,
-        risk_level: testCase.risk_level,
-        status: "active",
-      })
+      .insert(insertPayload)
       .select("*")
       .single();
 
@@ -143,11 +207,23 @@ export async function POST(request: NextRequest) {
           { status: 403 },
         );
       }
+      if (error?.code === "PGRST204") {
+        return NextResponse.json(
+          {
+            error: "schema_cache_stale",
+            message: "The Living Test Suite migration is not visible to Supabase PostgREST yet. Reload schema cache before saving full test case metadata.",
+          },
+          { status: 409 },
+        );
+      }
+      if (isRetryableNetworkError(error)) {
+        return saveRequestErrorResponse(error, "Selected test cases could not be saved.");
+      }
       failures.push({ title: testCase.title, reason: error?.code ?? "insert_failed" });
       continue;
     }
 
-    const { error: versionError } = await supabase.from("test_case_versions").insert({
+    const versionPayload = {
       test_case_id: createdCase.id,
       version_number: 1,
       title: createdCase.title,
@@ -157,8 +233,15 @@ export async function POST(request: NextRequest) {
       expected_result: createdCase.expected_result,
       platform: createdCase.platform,
       risk_level: createdCase.risk_level,
+      priority: createdCase.priority,
+      case_type: createdCase.case_type,
+      test_data: createdCase.test_data,
+      automation_candidate: createdCase.automation_candidate,
       status: createdCase.status,
-    });
+      change_reason: "Initial saved version",
+    };
+
+    const { error: versionError } = await supabase.from("test_case_versions").insert(versionPayload);
 
     if (versionError) {
       console.error("Test case version insert failed", {
@@ -167,6 +250,9 @@ export async function POST(request: NextRequest) {
         details: versionError.details,
         testCaseId: createdCase.id,
       });
+      if (isRetryableNetworkError(versionError)) {
+        return saveRequestErrorResponse(versionError, "The test case was saved, but its initial version could not be created.");
+      }
       failures.push({ title: createdCase.title, reason: versionError.code ?? "version_insert_failed" });
     }
 

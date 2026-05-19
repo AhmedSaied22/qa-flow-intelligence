@@ -18,6 +18,10 @@ create table if not exists public.test_cases (
   expected_result text,
   platform text not null,
   risk_level text not null,
+  priority text not null default 'medium',
+  case_type text not null default 'functional',
+  test_data jsonb not null default '[]'::jsonb,
+  automation_candidate text,
   status text not null default 'active',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -46,7 +50,12 @@ create table if not exists public.test_case_versions (
   expected_result text,
   platform text not null,
   risk_level text not null,
+  priority text not null default 'medium',
+  case_type text not null default 'functional',
+  test_data jsonb not null default '[]'::jsonb,
+  automation_candidate text,
   status text not null,
+  change_reason text,
   created_at timestamptz not null default now()
 );
 

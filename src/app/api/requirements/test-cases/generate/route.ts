@@ -61,6 +61,15 @@ function getTestCaseGenerationValidationErrors(value: unknown) {
     if (testCase.type !== undefined && typeof testCase.type !== "string") {
       errors.push(`test_cases[${index}].type must be a string when present.`);
     }
+    if (
+      testCase.priority !== undefined &&
+      testCase.priority !== "critical" &&
+      testCase.priority !== "high" &&
+      testCase.priority !== "medium" &&
+      testCase.priority !== "low"
+    ) {
+      errors.push(`test_cases[${index}].priority must be critical, high, medium, or low when present.`);
+    }
     if (testCase.test_data !== undefined && (!Array.isArray(testCase.test_data) || !testCase.test_data.every((entry) => typeof entry === "string"))) {
       errors.push(`test_cases[${index}].test_data must be an array of strings when present.`);
     }
@@ -132,6 +141,7 @@ function normalizeTestCaseGenerationOutput(value: unknown, limit: 5 | 10 | 20) {
             steps,
             expected_result: normalizeTestCaseValue(testCase.expected_result),
             risk_level: typeof testCase.risk_level === "string" ? testCase.risk_level.toLowerCase() : testCase.risk_level,
+            priority: typeof testCase.priority === "string" ? testCase.priority.toLowerCase() : testCase.priority,
             type: typeof testCase.type === "string" ? testCase.type.trim() : testCase.type,
             test_data: testData,
             automation_candidate: automationCandidate,

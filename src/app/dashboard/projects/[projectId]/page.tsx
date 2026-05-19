@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, ClipboardList, Plus } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -104,6 +104,10 @@ export default async function ProjectRequirementsPage({
               <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
             </div>
           </div>
+          <Link className={buttonVariants({ variant: "outline", size: "sm" })} href={`/dashboard/projects/${project.id}/test-suite`}>
+            <ClipboardList className="size-4" />
+            Living Test Suite
+          </Link>
         </div>
 
         <form
